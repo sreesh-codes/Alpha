@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpha Xpedition — Quant Cockpit</title>
+<style>
+:root{
+  --plane:#0d0d0d; --surface:#141414; --surface-2:#1a1a19; --raise:#202020;
+  --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-0.01em}
+h2{font-size:17px;margin-bottom:2px}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin:18px 0 8px}
+a{color:var(--s1)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px 80px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);font-size:12.5px}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}
+
+/* ---------- header / risk bar ---------- */
+header{position:sticky;top:0;z-index:50;background:rgba(13,13,13,0.96);border-bottom:1px solid var(--ring);backdrop-filter:blur(8px)}
+.hdr-top{max-width:1280px;margin:0 auto;padding:10px 16px 0;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.hdr-top h1{font-size:15px;letter-spacing:0.14em;text-transform:uppercase}
+.riskbar{max-width:1280px;margin:0 auto;padding:8px 16px 10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.kpi{background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:7px 9px;min-width:0}
+.kpi .k{font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;letter-spacing:-0.02em;margin-top:1px}
+.kpi .n{font-size:10.5px;color:var(--muted);font-family:var(--mono)}
+.ok{color:var(--good)} .bad{color:var(--crit)} .wn{color:var(--warn)} .sr{color:var(--serious)}
+.flag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;border:1px solid currentColor}
+
+nav{max-width:1280px;margin:0 auto;padding:0 10px;display:flex;gap:2px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:inherit;font-size:12.5px;padding:8px 10px;cursor:pointer;white-space:nowrap}
+nav button:hover{color:var(--ink-2)}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--s1)}
+
+/* ---------- layout ---------- */
+.panel{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:14px 16px;margin-top:14px}
+.cols{display:grid;gap:14px}
+.cols>*{min-width:0}
+@media(max-width:700px){header{position:static}.riskbar{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:900px){.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr 1fr 1fr}.c23{grid-template-columns:1.1fr 1fr}}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);letter-spacing:0.04em;text-transform:uppercase}
+input,select,textarea{background:var(--surface-2);border:1px solid var(--ring);color:var(--ink);border-radius:6px;padding:6px 8px;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+input:focus,select:focus,textarea:focus{outline:1px solid var(--s1);border-color:var(--s1)}
+input[type=number]{width:104px} input.w6{width:70px} input.w10{width:140px} input.wide{width:100%}
+input[type=range]{accent-color:var(--s1);padding:0}
+button.btn{background:var(--raise);border:1px solid var(--ring);color:var(--ink);border-radius:6px;padding:6px 11px;font:inherit;font-size:12.5px;cursor:pointer}
+button.btn:hover{border-color:var(--s1);color:#fff}
+button.btn.pri{background:var(--s1);border-color:var(--s1);color:#fff}
+button.btn.dang{border-color:var(--crit);color:var(--crit)}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+th{text-align:right;font-weight:500;color:var(--muted);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;padding:5px 7px;border-bottom:1px solid var(--axis);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 7px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap}
+tr:hover td{background:var(--surface-2)}
+.scroll{overflow-x:auto}
+.note{border-left:2px solid var(--s1);background:rgba(57,135,229,0.07);padding:9px 12px;border-radius:0 6px 6px 0;font-size:13px;margin:10px 0}
+.note.w{border-color:var(--warn);background:rgba(250,178,25,0.07)}
+.note.c{border-color:var(--crit);background:rgba(208,59,59,0.08)}
+.note.g{border-color:var(--good);background:rgba(12,163,12,0.07)}
+.big{font-family:var(--mono);font-size:28px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.tag{font-size:10px;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);border:1px solid var(--ring);border-radius:4px;padding:1px 5px}
+.bar{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;border-radius:3px}
+ul.tight{margin:6px 0;padding-left:18px} ul.tight li{margin:3px 0}
+.hidden{display:none}
+.chartwrap{background:var(--surface);border-radius:8px;padding:4px 0}
+.chartwrap svg{max-width:760px;display:block}
+svg text{font-family:var(--sans);font-size:10px;fill:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin:4px 0 2px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+details summary{cursor:pointer;color:var(--ink-2);font-size:12.5px;padding:4px 0}
+.kbd{font-family:var(--mono);background:var(--raise);border:1px solid var(--ring);border-radius:4px;padding:1px 5px;font-size:11.5px}
+.eq{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--grid);border-radius:6px;padding:7px 10px;margin:6px 0;overflow-x:auto}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-top">
+    <h1>Alpha Xpedition · Quant Cockpit</h1>
+    <span class="sub">advisory only — every order placed by hand</span>
+    <span style="flex:1"></span>
+    <button class="btn" id="saveBtn">Save state</button>
+    <button class="btn dang" id="resetBtn">Reset</button>
+  </div>
+  <div class="riskbar" id="riskbar"></div>
+  <nav id="nav"></nav>
+</header>
+
+<div class="wrap">
+
+<!-- ============ DESK ============ -->
+<section data-tab="desk">
+  <div class="cols c23">
+    <div class="panel">
+      <h2>Book</h2>
+      <div class="sub">Signed quantities — negative is short. Prices default to the board snapshot; overwrite as they move.</div>
+      <div class="row" style="margin-top:10px">
+        <label class="f">Cash<input type="number" id="cash" step="1000"></label>
+        <label class="f">Bailout injections<input type="number" id="inj" step="1000"></label>
+        <label class="f">Bailouts n<input type="number" id="nBail" class="w6" min="0" max="3" step="1"></label>
+        <label class="f">Bot penalties p<input type="number" id="nBot" class="w6" min="0" step="1"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="f">Peak net equity<input type="number" id="peak" step="1000" class="w10"></label>
+        <label class="f">Recorded max DD %<input type="number" id="ddRec" step="0.01" class="w6"></label>
+        <button class="btn" id="peakReset">Reset peak &amp; DD</button>
+      </div>
+      <div class="hint">Adding a position books it at the current price — cash moves the other way, so equity does not jump. Marking prices in the Spillover tab is what moves equity. Overwrite cash to match your terminal whenever it drifts. Peak and max drawdown ratchet automatically as net equity moves; if your desk shows a different drawdown, type the desk's number in — the engine is the source of truth, not this page.</div>
+      <div class="row" style="margin-top:10px">
+        <label class="f">Add position
+          <select id="addSel"></select>
+        </label>
+        <label class="f">Qty<input type="number" id="addQty" class="w10" step="1" value="100"></label>
+        <button class="btn" id="addBtn">Add / set</button>
+        <button class="btn" id="flatBtn">Flatten all</button>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table id="bookTbl"></table></div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Score mechanics</h2>
+        <div class="eq">R = N/1,000,000 − 1&nbsp;&nbsp;·&nbsp;&nbsp;S = R / max(D, 5%)&nbsp;&nbsp;·&nbsp;&nbsp;S_final = S − 0.3(n+p)|S|</div>
+        <div id="scoreBox"></div>
+      </div>
+      <div class="panel">
+        <h2>Margin</h2>
+        <div class="eq">E = cash + Σ q·P&nbsp;&nbsp;·&nbsp;&nbsp;G = Σ|q·P|&nbsp;&nbsp;·&nbsp;&nbsp;m = E/G&nbsp;&nbsp;·&nbsp;&nbsp;G ≤ 2E</div>
+        <div id="marginBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Stress test</h2>
+    <div class="sub">An adverse move of x% on gross notional costs x%·G of equity. Drawdown is measured against your running peak, so gains tighten the percentage you can give back.</div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Adverse move on gross %<input type="number" id="stressPct" step="0.5" value="3"></label>
+    </div>
+    <div class="scroll" style="margin-top:10px"><table id="stressTbl"></table></div>
+  </div>
+
+  <div class="panel">
+    <h2>Hard stops — agree these before the bell</h2>
+    <div class="note g"><b>The first 5% of drawdown is free.</b> Below the floor, <span class="mono">S = 20R</span> regardless of how you got there, so the only mistake is leaving risk budget unused. Above it, each extra point of drawdown needs <span class="mono">ΔR/R ≥ ΔD/D</span> — the first point past the floor is the most expensive one you will ever buy.</div>
+    <ul class="tight">
+      <li><b>DD 4.0%</b> — halve gross exposure. No discussion.</li>
+      <li><b>DD 5.0%</b> — flat into bonds (0.05% spread, 60M depth) for one full minute.</li>
+      <li><b>m &lt; 0.45</b> — reduce. The 0.35 banner is already too late to be comfortable.</li>
+      <li><b>Never above 1.4× gross.</b> At 2.0× a ~12.5% adverse move on gross force-liquidates you at impact prices.</li>
+      <li><b>Zero bailouts.</b> −30% of |S| each, and a forced liquidation prints the drawdown that caused it.</li>
+      <li>Risk officer holds an absolute veto. The trader does not argue with it mid-session.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ UNIVERSE / SPILLOVER ============ -->
+<section data-tab="spill" class="hidden">
+  <div class="panel">
+    <h2>Spillover propagation</h2>
+    <div class="sub">Published coefficients: same nation 25% · same sector, other nations 15% · nation in tension 20% inverse · no asset ripples more than 3% from one event. These are deterministic — the edge is reacting to the neighbours before the room does.</div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Source asset<select id="spSrc"></select></label>
+      <label class="f">Headline move %<input type="number" id="spShock" step="0.5" value="10"></label>
+      <label class="f">Tension pair<select id="spTension">
+        <option value="">none active</option>
+        <option value="VAL|ZAR">Valdemont ↔ Zarhan</option>
+        <option value="VAL|KOR">Valdemont ↔ Korvath</option>
+        <option value="VAL|NIM">Valdemont ↔ Nimbus</option>
+        <option value="ZAR|KOR">Zarhan ↔ Korvath</option>
+        <option value="ZAR|NIM">Zarhan ↔ Nimbus</option>
+        <option value="KOR|NIM">Korvath ↔ Nimbus</option>
+      </select></label>
+      <label class="f">Sizing budget (credits)<input type="number" id="spBudget" step="10000" value="100000"></label>
+    </div>
+    <div id="spSummary"></div>
+    <div class="scroll" style="margin-top:10px"><table id="spTbl"></table></div>
+  </div>
+
+  <div class="panel">
+    <h2>Universe</h2>
+    <div class="sub">Depth is derived: one order may be at most 20% of depth, so <span class="mono">depth = 5 × max order</span>. Volatility class is confirmed for ZAP only — check the board and correct the rest, it changes both spread and depth.</div>
+    <div class="scroll" style="margin-top:10px"><table id="uniTbl"></table></div>
+  </div>
+</section>
+
+<!-- ============ IMPACT / FADE ============ -->
+<section data-tab="impact" class="hidden">
+  <div class="panel">
+    <h2>Mean-reversion fade thresholds</h2>
+    <div class="sub">Trading pressure decays toward underlying value; news moves value permanently. So the whole discriminator is <b>was there a headline at this timestamp</b> — and headlines are on the board, not your laptop. A deviation is only worth fading once it clears the round trip.</div>
+    <div class="eq">d* = round-trip cost ÷ (1 − 2^(−t/τ))&nbsp;&nbsp;&nbsp;τ = reversion half-life, t = intended hold</div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Half-life τ (s)<input type="number" id="hl" step="5" value="60"></label>
+      <label class="f">Hold t (s)<input type="number" id="hold" step="10" value="120"></label>
+      <label class="f">Order notional<input type="number" id="impNotional" step="10000" value="200000"></label>
+    </div>
+    <div id="fadeSummary"></div>
+    <div class="scroll" style="margin-top:10px"><table id="fadeTbl"></table></div>
+  </div>
+
+  <div class="cols c2">
+    <div class="panel">
+      <h2>Impact model &amp; calibration</h2>
+      <div class="eq">slippage = k · (notional / depth)^α</div>
+      <div class="sub">The rules state impact exists but not its shape. Log three fills in Session 1 and this fits it. Until then the defaults are a guess — treat them as such.</div>
+      <div class="row" style="margin-top:10px">
+        <label class="f">k<input type="number" id="impK" step="0.001" value="0.045"></label>
+        <label class="f">α<input type="number" id="impA" step="0.05" value="0.5"></label>
+        <span class="tag" id="calibTag">uncalibrated</span>
+      </div>
+      <h3>Observed fills</h3>
+      <div class="sub" style="margin-bottom:6px">Slippage = (actual fill − mid) / mid, minus half the spread, in %.</div>
+      <div class="row">
+        <label class="f">Notional<input type="number" id="cfN" step="10000" class="w10"></label>
+        <label class="f">Depth<input type="number" id="cfD" step="100000" class="w10"></label>
+        <label class="f">Slippage %<input type="number" id="cfS" step="0.01" class="w6"></label>
+        <button class="btn" id="cfAdd">Log fill</button>
+      </div>
+      <div class="scroll" style="margin-top:8px"><table id="cfTbl"></table></div>
+    </div>
+
+    <div class="panel">
+      <h2>Order splitting</h2>
+      <div class="sub">With α &lt; 1 impact is concave, so slicing cuts average slippage. Reality sits between the two bounds below: slices push the price for the ones behind them. The binding limits are 3 orders/sec and the bot watch — slice by hand, at a human rhythm.</div>
+      <div class="row" style="margin-top:10px">
+        <label class="f">Asset<select id="splitSel"></select></label>
+        <label class="f">Total notional<input type="number" id="splitN" step="50000" value="400000"></label>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table id="splitTbl"></table></div>
+      <div class="note w">One order may be at most 20% of depth. Anything larger is rejected outright, so a big position <i>must</i> be sliced regardless of cost.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EVENTS / ENVELOPES ============ -->
+<section data-tab="events" class="hidden">
+  <div class="cols c23">
+    <div class="panel">
+      <h2>Posterior from odds + envelopes</h2>
+      <div class="sub">Published odds are your prior. An envelope is noisy evidence — a single one barely moves you, but two that agree move you a lot. That asymmetry is the whole reason to buy on the Back Channel.</div>
+      <div class="eq">P(T=A | E=A) ∝ θ·p_A&nbsp;&nbsp;·&nbsp;&nbsp;P(E=A | T=B) = (1−θ)/(k−1)</div>
+      <div class="row" style="margin-top:10px">
+        <label class="f">Outcomes<select id="evPreset"></select></label>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table id="evTbl"></table></div>
+      <div class="row" style="margin-top:12px">
+        <label class="f" style="flex:1;min-width:220px">Envelope truth rate θ = <span class="mono" id="thetaV">0.60</span>
+          <input type="range" id="theta" min="0.34" max="0.98" step="0.01" value="0.60" style="width:100%">
+        </label>
+      </div>
+      <div class="hint">Keep a tally all day: envelopes that named the revealed outcome ÷ envelopes seen. θ = 0.5 means an envelope is nearly worthless; θ = 0.8 means one envelope is a real signal. Guessing θ high is the expensive error.</div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Accord watch</h2>
+        <div class="sub">Opening an envelope starts a 120-second watch on every asset that chapter can move. The reveal is mid-session, so open early and the watch expires before the information is worth anything.</div>
+        <div class="big" id="watchClock" style="margin-top:8px">—</div>
+        <div id="watchState"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn pri" id="watchStart">Opened an envelope — start 120s</button>
+          <button class="btn" id="watchStop">Clear</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Fine exposure</h2>
+        <div class="eq">fine = max(10,000 , 20% × trade value)</div>
+        <div class="row">
+          <label class="f">Trade notional<input type="number" id="fineN" step="10000" value="200000"></label>
+          <label class="f">P(raided) %<input type="number" id="fineP" step="5" value="15" class="w6"></label>
+        </div>
+        <div id="fineBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Position sizing against the draw</h2>
+    <div class="sub">Enter the move you expect in one asset under each outcome. The tradeable edge is not your expected move — it is the move the room has <i>not</i> priced, so it is measured against the prior, not against zero.</div>
+    <div class="eq">edge = Σ (posterior_i − prior_i) · m_i&nbsp;&nbsp;·&nbsp;&nbsp;max size = free drawdown budget ÷ (|worst move| × price)</div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Asset<select id="szSel"></select></label>
+    </div>
+    <div class="scroll" style="margin-top:10px"><table id="szTbl"></table></div>
+    <div id="szBox"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Reroll vote</h2>
+    <div class="sub">30 seconds, needs Yes from more than half of the houses still in. Silence counts as No. A tie counts as No. <b>The first vote that passes burns the reroll for the entire game.</b></div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">P&amp;L on the roll that landed<input type="number" id="rrNow" step="1000" value="0"></label>
+      <label class="f">Reroll already burned?<select id="rrBurn"><option value="0">no</option><option value="1">yes</option></select></label>
+      <label class="f">Sessions left after this<input type="number" id="rrLeft" class="w6" step="1" value="1"></label>
+    </div>
+    <div class="hint">Expected P&amp;L under a reroll is your current position in the sizing asset above, marked across its outcome moves and weighted by the published prior — a fresh roll is drawn from the same odds, and envelopes are not redone.</div>
+    <div id="rrBox"></div>
+  </div>
+</section>
+
+<!-- ============ OPTIONS ============ -->
+<section data-tab="options" class="hidden">
+  <div class="panel">
+    <h2>Session 5 — PTRV options</h2>
+    <div class="note">The rulebook hands you the trade: <i>quotes are a smooth-volatility price, while the decision this session is a jump with published odds.</i> A single lognormal cannot fit a three-point outcome distribution. The mispricing concentrates in the wings and in straddles.</div>
+    <div class="sub">Volatility is entered as the total standard deviation of return to expiry, in %, which sidesteps annualisation entirely. Solve it from any one house quote and the same number prices all six series — that is what "one smooth volatility" means.</div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">PTRV at session open<input type="number" id="opS" step="0.01" value="202.04"></label>
+      <label class="f">σ to expiry %<input type="number" id="opVol" step="0.1" value="6"></label>
+      <label class="f">Residual σ after jump %<input type="number" id="opResid" step="0.1" value="2.4"></label>
+    </div>
+    <h3>Solve σ from a house quote</h3>
+    <div class="row">
+      <label class="f">Series<select id="ivSel"></select></label>
+      <label class="f">House mid<input type="number" id="ivPx" step="0.01" class="w6"></label>
+      <button class="btn" id="ivBtn">Solve σ</button>
+      <span class="mono sub" id="ivOut"></span>
+    </div>
+    <h3>Jump scenarios on PTRV</h3>
+    <div class="scroll"><table id="opScenTbl"></table></div>
+    <div class="hint">Session 5's published odds are deal 50 / stall 30 / restriction 20. Petrova is Korvath energy: a restriction hands Korvath the sea lane, a deal cheapens every crossing. Set the magnitudes from your own read, then check them against the ticker once the roll lands.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Edge by series</h2>
+    <div class="sub">Model value is a mixture of lognormals — the jump shifts the spot, the residual vol fills in the rest. Buying at the ask, only a positive edge column is a trade.</div>
+    <div class="scroll" style="margin-top:8px"><table id="opTbl"></table></div>
+    <div class="legend"><span><i style="background:var(--s1)"></i>model fair value</span><span><i style="background:var(--s2)"></i>house ask</span></div>
+    <div class="chartwrap" id="opChart"></div>
+    <div id="opStrad"></div>
+  </div>
+</section>
+
+<!-- ============ IPO ============ -->
+<section data-tab="ipo" class="hidden">
+  <div class="cols c2">
+    <div class="panel">
+      <h2>Ledgerly — valuation</h2>
+      <div class="sub">Uniform price, sealed bid, 200,000 shares, bids under 20 rejected, closes 81 seconds in. Read the prospectus the second the session opens; it is the only thing that tells you what LDGR is worth.</div>
+      <div class="note w">Ledgerly is a Zarhan <i>ledger bank</i> and the populist just ordered a review of every digital bank. Whatever multiple the comparables give you, that review belongs in the haircut.</div>
+      <h3>Comparables</h3>
+      <div class="scroll"><table id="compTbl"></table></div>
+      <div class="row" style="margin-top:8px">
+        <label class="f">LDGR metric (same basis)<input type="number" id="ldgrMetric" step="0.01" value="4"></label>
+        <label class="f">Haircut %<input type="number" id="ldgrCut" step="5" value="20" class="w6"></label>
+        <label class="f">Value override<input type="number" id="ldgrOvr" step="0.5" placeholder="auto"></label>
+      </div>
+      <div id="valBox"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Bid ladder</h2>
+      <div class="eq">shaded value = V − λ·σ_V&nbsp;&nbsp;(winner's curse: E[V | you won] &lt; E[V])</div>
+      <div class="sub">You pay the clearing price, not your bid, so bidding slightly above your value secures allocation cheaply — <i>unless</i> your bid is the one that sets the clearing price. Hence a ladder, with the weight at your value and a thin slice above it.</div>
+      <div class="row" style="margin-top:10px">
+        <label class="f">σ_V (uncertainty)<input type="number" id="sigV" step="0.5" value="4"></label>
+        <label class="f">λ shade<input type="number" id="lamV" step="0.1" value="0.5" class="w6"></label>
+        <button class="btn" id="ladderBtn">Generate ladder</button>
+      </div>
+      <div class="hint">The generator commits 35% of cash: 20% of it in a thin slice 8% above shaded value to secure a fill, 55% at shaded value, 25% at 10% below as an opportunistic scoop. Edit freely.</div>
+      <div class="scroll" style="margin-top:10px"><table id="bidTbl"></table></div>
+      <div id="cashBox"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Clearing simulator</h2>
+    <div class="sub">Your read on the rest of the room, as a demand curve: at each price, how many shares the other houses want in total at or above it. Bids sort from the highest price down until 200,000 shares run out; everyone pays the last price needed, and ties at it share pro rata.</div>
+    <div class="scroll" style="margin-top:10px"><table id="demTbl"></table></div>
+    <div id="clearBox"></div>
+  </div>
+</section>
+
+<!-- ============ BLACK SWAN ============ -->
+<section data-tab="swan" class="hidden">
+  <div class="panel">
+    <h2>Session 6 — the d6</h2>
+    <div class="sub">Three faces are named in the story; the other three are not. Each face below is a primary shock, and the engine propagates it through the spillover rules before marking your book. What you want is not the best expected outcome — it is the <b>best worst case</b>, because one bad face can print a drawdown you cannot earn back in the time left.</div>
+    <div class="scroll" style="margin-top:10px"><table id="swanTbl"></table></div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Face<select id="swFace"></select></label>
+      <label class="f">Asset<select id="swAsset"></select></label>
+      <label class="f">Shock %<input type="number" id="swShock" step="1" value="-20" class="w6"></label>
+      <button class="btn" id="swAdd">Set shock</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Book under each face</h2>
+    <div class="scroll"><table id="swPnlTbl"></table></div>
+    <div class="legend"><span><i style="background:var(--good)"></i>score improves</span><span><i style="background:var(--crit)"></i>score falls</span></div>
+    <div class="chartwrap" id="swChart"></div>
+    <div id="swBox"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Minimax hedge</h2>
+    <div class="sub">For every instrument, the quantity that maximises your worst case across all six faces. Ranked by how much it lifts the floor — not by expected profit.</div>
+    <div class="row" style="margin-top:10px">
+      <label class="f">Max hedge notional<input type="number" id="hedgeCap" step="50000" value="300000"></label>
+      <button class="btn pri" id="hedgeBtn">Solve</button>
+    </div>
+    <div class="scroll" style="margin-top:10px"><table id="hedgeTbl"></table></div>
+  </div>
+</section>
+
+<!-- ============ PLAYBOOK ============ -->
+<section data-tab="play" class="hidden">
+  <div class="panel">
+    <h2>Doctrine</h2>
+    <div class="note g"><b>You are not maximising return. You are maximising R / max(D, 5%).</b> A house at +15% with 8% drawdown scores 1.87. A house at +30% with 30% drawdown scores 1.00. The rulebook prints this example itself, which means the organisers expect most of the room to miss it.</div>
+    <ul class="tight">
+      <li><b>Spend the free 5%, then stop.</b> Below the floor, extra caution earns nothing. Above it, the first point costs the most.</li>
+      <li><b>Winning makes you more conservative, not less.</b> Drawdown is measured from a running peak, so every credit earned shrinks the give-back you can afford.</li>
+      <li><b>Round-trip cost decides what you are allowed to trade.</b> Bonds 0.10%, standard 0.40%, high-vol 0.60%, Frostwood 0.50%, Intricoin 1.00%. Intricoin needs a ten-times larger move than a bond to be worth touching — most of the room will day-trade it anyway because it is the coin.</li>
+      <li><b>Fade the room, trade the news.</b> No headline on the board ⇒ it is someone's market impact ⇒ it reverts within about two minutes. Headline on the board ⇒ underlying value moved ⇒ do not fade it, and go buy the neighbours.</li>
+      <li><b>Bonds are the parking lot.</b> 0.05% spread, 60M depth. Flattening into bonds is nearly free, which is what makes the hard stops actually executable.</li>
+      <li><b>The last 1.7 minutes are blind.</b> Nobody sees any rank. Gambling into an unobservable leaderboard is pure variance — be flat or hedged, with the drawdown locked.</li>
+    </ul>
+  </div>
+
+  <div class="cols c2">
+    <div class="panel">
+      <h2>Session cards</h2>
+      <h3>S1 · Earnings season</h3>
+      <ul class="tight"><li>Long only, cash only. The real job is <b>calibration</b>: log three fills of different sizes and fit k and α.</li><li>Confirm every volatility class and every sector off the board — the spillover matrix is worthless if the map is wrong.</li><li>Trade earnings beats via spillover, not via the stock that printed. The neighbours move 25% and the room is watching the headline name.</li></ul>
+      <h3>S2 · The Reserve decides</h3>
+      <ul class="tight"><li>Odds: hike 40 / hold 45 / cut 15. Bonds are the clean expression — 0.05% spread means the cheapest way to hold a rate view.</li><li>Envelopes begin. Buy, do not open. Price them off the posterior table, and remember an opened envelope can never be resold.</li><li>If you do open: start the 120s clock and <b>sit on your hands</b>. 20% of trade value is not a fine, it is an amputation.</li></ul>
+      <h3>S3 · Zarhan votes</h3>
+      <ul class="tight"><li>Shorts and 2× leverage unlock. Cap yourself at 1.4×.</li><li>Odds: reformist 55 / populist 45 — a near coin flip priced as a favourite. Pairs inside Zarhan beat an outright directional bet.</li><li>A populist win reviews the digital banks: ZAP and BZR down, Frostwood and SunVeld bid as savers run for safety.</li></ul>
+      <h3>S4 · The Ledgerly IPO</h3>
+      <ul class="tight"><li>Bidding closes 81 seconds in. Value it in the first 40 seconds or do not bid.</li><li>Locked cash still counts in equity but cannot trade — do not lock the margin you need for the rest of the session.</li><li>If the clearing price lands above value, the price drifts back to value. Letting the room overpay without you is a perfectly good outcome.</li></ul>
+      <h3>S5 · The Strait talks</h3>
+      <ul class="tight"><li>Live d20, no envelopes worth anything. Odds: deal 50 / stall 30 / restriction 20.</li><li>Options are long-only and expire at the close. Price the jump from the odds and compare to the smooth-vol quote.</li><li>Straddles are the purest expression — you are buying the jump size, and that is precisely what one lognormal cannot price.</li></ul>
+      <h3>S6 · The black swan</h3>
+      <ul class="tight"><li>Hedge <i>before</i> the roll. Six faces, three of them named; make sure none of them craters you.</li><li>Hold the reroll if it is still unspent — this is the roll it was meant for.</li><li>Last 1.7 minutes: blind. Flatten, protect the peak, bank the score.</li></ul>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Envelope protocol</h2>
+        <ul class="tight">
+          <li><b>Buying is never flagged.</b> Only opening starts a watch. So accumulate.</li>
+          <li><b>Two agreeing envelopes beat one by a mile.</b> Run them through the posterior table — the second one is where the convexity is.</li>
+          <li><b>Open early, trade late.</b> The watch is 120s; the reveal is mid-session. Opening the moment it lands means the watch is dead before the edge is live.</li>
+          <li><b>Unopened and expiring is still sellable until the reveal.</b> Opened is worthless to everyone else, forever. If you do not intend to act, sell.</li>
+          <li>Forced liquidations are never flagged, and a house that never opens an envelope is never flagged at all.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2>Reroll policy</h2>
+        <ul class="tight">
+          <li>One per game, and the first passed vote burns it for everyone.</li>
+          <li>A mid-game roll going against you is <b>not</b> worth the reroll. Vote No, stay quiet; abstention counts as No and silence is a vote in your favour.</li>
+          <li>Push Yes only when a roll is genuinely existential, or when you are holding a position the fresh draw is likely to rescue.</li>
+          <li>Envelopes are not redone — a tip still names the outcome that was sealed. A reroll invalidates the tip you paid for.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2>Honours worth sniping</h2>
+        <ul class="tight">
+          <li><b>Steadiest hand</b> — smallest drawdown among houses finishing in profit with 10+ trades. If you are playing the doctrine above you are already most of the way there. Just make sure you clear ten trades.</li>
+          <li><b>Best trade</b> — largest profit booked on one closing trade. Concentrate a single high-conviction event trade and close it in one order rather than scaling out.</li>
+          <li><b>Most active desk</b> — pure volume. Only chase it if bonds let you churn at 0.10% round trip without touching the drawdown.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2>Fair play — do not get clever</h2>
+        <div class="note c">Scripts, bots and browser automation are prohibited, and an AI agent operating your desk counts as automation. A confirmed penalty costs 30% of your score's size and freezes the desk for 57 seconds of open trading, or gets you eliminated. This page is a calculator. It does not touch the terminal, and nothing here should ever be wired to one.</div>
+        <ul class="tight">
+          <li>The bot watch flags <i>trading patterns</i>. Do not click at the 3/sec cap, do not place perfectly uniform slices at perfectly uniform intervals.</li>
+          <li>Ask the organisers, in writing, whether read-only price capture is permitted. If the answer is no, a human pastes the board.</li>
+          <li>Up to 3 logged-in devices. One of them is the desk, and only the trader touches it.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2>Desk roles</h2>
+        <ul class="tight">
+          <li><b>Board watcher</b> — faces the newsboard and ticker. No laptop. Calls headlines with timestamps. This is the highest-value seat in the room and everyone will under-staff it.</li>
+          <li><b>Analyst</b> — runs this page. Never touches the desk.</li>
+          <li><b>Trader</b> — the only pair of hands on the terminal.</li>
+          <li><b>Risk officer</b> — owns equity, drawdown, margin and the flatten veto.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Open questions to settle with the organisers</h2>
+    <ul class="tight">
+      <li>Session length — the rules table says 5 minutes each, the story says "the next forty-five minutes" for Session 6. If sessions really are five minutes, everything must be precomputed and this page is a lookup table, not a solver.</li>
+      <li>Is read-only data capture permitted?</li>
+      <li>Does the 3% ripple cap apply per source event or per asset per event?</li>
+      <li>During the 30-second reroll vote, "prices wait" — is trading halted, or just frozen at the last print?</li>
+      <li>What are the three government bonds, and what do they open at?</li>
+    </ul>
+  </div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const fmt=(x,d=2)=>(x==null||!isFinite(x))?"—":x.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmt0=x=>(x==null||!isFinite(x))?"—":Math.round(x).toLocaleString("en-US");
+const pct=(x,d=2)=>(x==null||!isFinite(x))?"—":(x>=0?"+":"")+ (x*100).toFixed(d)+"%";
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const cls=x=>x>0?"ok":x<0?"bad":"";
+
+/* ---------------- universe ---------------- */
+const CLASSES={
+  std :{label:"Standard stock",   spread:0.002,  maxOrder:2400000},
+  hv  :{label:"High-volatility",  spread:0.003,  maxOrder:1600000},
+  bond:{label:"Government bond",  spread:0.0005, maxOrder:12000000},
+  coin:{label:"Intricoin",        spread:0.005,  maxOrder:1200000},
+  wood:{label:"Frostwood",        spread:0.0025, maxOrder:4000000}
+};
+const NATIONS={VAL:"Valdemont",ZAR:"Zarhan",KOR:"Korvath",NIM:"Nimbus Isles",FRO:"Frostwalk"};
+const U0=[
+ ["GMB","Goldmere Bank","VAL","Banking","std",242.33],
+ ["LMRA","Lumora Systems","VAL","Tech","hv",316.86],
+ ["VGRD","Valdemont Grid","VAL","Energy","std",58.11],
+ ["BELL","Maison Bellamy","VAL","Consumer","std",424.43],
+ ["RGLF","Regalia Freight","VAL","Logistics","std",71.23],
+ ["ZAP","ZapPay","ZAR","Banking","hv",62.91],
+ ["QNTC","Quantica Chips","ZAR","Tech","hv",144.20],
+ ["SUNV","SunVeld Solar","ZAR","Energy","hv",45.19],
+ ["BZR","Bazaario","ZAR","Consumer","hv",95.47],
+ ["MNSN","Monsoon Logistics","ZAR","Logistics","std",42.96],
+ ["KSB","Korvath State Bank","KOR","Banking","std",56.87],
+ ["BSTN","Bastion Cyber","KOR","Tech","hv",102.96],
+ ["PTRV","Petrova Energy","KOR","Energy","std",202.04],
+ ["GRAN","Granary Foods","KOR","Consumer","std",34.96],
+ ["ISTR","Ironstrait Shipping","KOR","Logistics","std",86.00],
+ ["SGLS","Seaglass Trust","NIM","Banking","std",121.30],
+ ["HASH","HashHarbor Exchange","NIM","Tech","hv",75.53],
+ ["EMBR","Emberpeak Geothermal","NIM","Energy","std",72.31],
+ ["PALM","Palmtree Resorts","NIM","Consumer","std",51.43],
+ ["CORL","Coral Port Holdings","NIM","Logistics","std",64.55],
+ ["INCN","Intricoin","NIM","Coin","coin",1069.09],
+ ["WOOD","Frostwood","FRO","Commodity","wood",2606.71],
+ ["VBND","Valdemont bond","VAL","Bond","bond",100.00],
+ ["ZBND","Zarhan bond","ZAR","Bond","bond",100.00],
+ ["KBND","Korvath bond","KOR","Bond","bond",100.00],
+ ["LDGR","Ledgerly","ZAR","Banking","hv",0]
+];
+
+/* ---------------- state ---------------- */
+const DEF={
+  uni:U0.map(([t,n,nat,sec,c,px])=>({t,n,nat,sec,c,px})),
+  book:{}, cash:1000000, inj:0, nBail:0, nBot:0, peak:1000000, ddRec:0,
+  impK:0.045, impA:0.5, fills:[],
+  evOutcomes:[{l:"Deal",p:50},{l:"Stall",p:30},{l:"Restriction",p:20}],
+  envs:["","",""], theta:0.60,
+  szMoves:{}, szAsset:"PTRV",
+  comps:[{t:"ZAP",px:62.91,m:5},{t:"KSB",px:56.87,m:4.6},{t:"GMB",px:242.33,m:19},{t:"SGLS",px:121.30,m:9.5}],
+  bids:[{p:0,q:0},{p:0,q:0},{p:0,q:0}],
+  demand:[{p:40,q:40000},{p:34,q:110000},{p:28,q:200000},{p:22,q:320000}],
+  swan:[
+    {l:"HashHarbor vault breached", s:{HASH:-28,INCN:-22}},
+    {l:"Goldmere depositor run",     s:{GMB:-26}},
+    {l:"Korvath navy mobilises",     s:{ISTR:-16,PTRV:12}},
+    {l:"Face 4 — unknown",           s:{}},
+    {l:"Face 5 — unknown",           s:{}},
+    {l:"Face 6 — unknown",           s:{}}
+  ],
+  opScen:[{l:"Deal",p:50,m:-6},{l:"Stall",p:30,m:1},{l:"Restriction",p:20,m:14}]
+};
+let st=structuredClone(DEF);
+const KEY="alphaxp.v1";
+function load(){try{const r=localStorage.getItem(KEY); if(r){const o=JSON.parse(r); st=Object.assign(structuredClone(DEF),o);}}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
+load();
+
+const A=t=>st.uni.find(u=>u.t===t);
+const depthOf=u=>CLASSES[u.c].maxOrder/0.20;
+const spreadOf=u=>CLASSES[u.c].spread;
+const roundTrip=u=>spreadOf(u);   /* bid→ask crossing once each way = full spread */
+
+/* ---------------- core risk ---------------- */
+function core(){
+  let E=st.cash,G=0,gross=0;
+  for(const [t,q] of Object.entries(st.book)){
+    const u=A(t); if(!u||!q) continue;
+    E+=q*u.px; G+=Math.abs(q*u.px); gross+=Math.abs(q*u.px);
+  }
+  const N=E-st.inj;
+  const peak=Math.max(st.peak,1000000,N);
+  const ddNow=(peak-N)/peak;
+  const D=Math.max(st.ddRec,ddNow,0);
+  const R=N/1000000-1;
+  const S=R/Math.max(D,0.05);
+  const pen=0.3*(st.nBail+st.nBot)*Math.abs(S);
+  const Sf=S-pen;
+  const m=G>0?E/G:Infinity;
+  const freeBudget=peak*0.05-(peak-N);
+  return {E,G,N,R,D,ddNow,peak,S,Sf,m,freeBudget,gross};
+}
+
+function renderRisk(){
+  const c=core();
+  const mState = !isFinite(c.m)?["flat","ok"] : c.m<0.25?["MARGIN CALL","bad"] : c.m<0.35?["WARNING","bad"] : c.m<0.45?["tight","wn"] : ["ok","ok"];
+  const dState = c.D<0.04?["ok"] : c.D<0.05?["wn"] : ["bad"];
+  $("#riskbar").innerHTML=`
+    <div class="kpi"><div class="k">Net equity</div><div class="v">${fmt0(c.N)}</div><div class="n">E ${fmt0(c.E)}</div></div>
+    <div class="kpi"><div class="k">Return R</div><div class="v ${cls(c.R)}">${pct(c.R)}</div><div class="n">${fmt0(c.N-1000000)}</div></div>
+    <div class="kpi"><div class="k">Drawdown D</div><div class="v ${dState[0]}">${(c.D*100).toFixed(2)}%</div><div class="n">peak ${fmt0(c.peak)}</div></div>
+    <div class="kpi"><div class="k">Score S_final</div><div class="v ${cls(c.Sf)}">${fmt(c.Sf)}</div><div class="n">pre-penalty ${fmt(c.S)}</div></div>
+    <div class="kpi"><div class="k">Margin m</div><div class="v ${mState[1]}">${isFinite(c.m)?fmt(c.m):"∞"}</div><div class="n">${mState[0]}</div></div>
+    <div class="kpi"><div class="k">Gross G</div><div class="v">${fmt0(c.G)}</div><div class="n">${c.E>0?fmt(c.G/c.E):"—"}× equity</div></div>
+    <div class="kpi"><div class="k">Free DD budget</div><div class="v ${c.freeBudget>0?"ok":"bad"}">${fmt0(c.freeBudget)}</div><div class="n">${c.freeBudget>0?"below the 5% floor":"floor breached"}</div></div>`;
+}
+
+function renderScore(){
+  const c=core();
+  const mrs = c.D>0.05 ? 0.01/c.D : null;
+  const needed = mrs!=null ? c.R*mrs : null;
+  $("#scoreBox").innerHTML=`
+  <table>
+    <tr><th>Quantity</th><th>Value</th><th>Reading</th></tr>
+    <tr><td>Return R</td><td class="${cls(c.R)}">${pct(c.R)}</td><td class="sub">net of injections</td></tr>
+    <tr><td>Drawdown D</td><td>${(c.D*100).toFixed(2)}%</td><td class="sub">${c.D<0.05?"floored at 5% — free zone":"above the floor, every point now costs"}</td></tr>
+    <tr><td>Effective divisor</td><td>${(Math.max(c.D,0.05)*100).toFixed(2)}%</td><td class="sub">max(D, 5%)</td></tr>
+    <tr><td>S</td><td class="${cls(c.S)}">${fmt(c.S)}</td><td class="sub">risk-adjusted</td></tr>
+    <tr><td>Penalty</td><td class="${st.nBail+st.nBot?"bad":""}">−${fmt(0.3*(st.nBail+st.nBot)*Math.abs(c.S))}</td><td class="sub">${st.nBail} bailouts · ${st.nBot} bot</td></tr>
+    <tr><td><b>S_final</b></td><td class="${cls(c.Sf)}"><b>${fmt(c.Sf)}</b></td><td class="sub">${c.Sf>0?"ranked on this":"negative — penalties make it worse, never better"}</td></tr>
+  </table>
+  ${c.D<0.05
+    ? `<div class="note g">You are inside the free zone. Losing another <b class="mono">${fmt0(c.freeBudget)}</b> credits changes your score by <b>nothing</b>. Risk you are not taking here is simply wasted.</div>`
+    : `<div class="note w">Above the floor. Buying one more point of drawdown now requires <b>${needed!=null?pct(needed):"—"}</b> of extra return just to hold this score.</div>`}
+  <div class="bar" title="drawdown against the 5% floor"><i style="width:${Math.min(100,c.D/0.05*100).toFixed(1)}%;background:${c.D<0.04?"var(--good)":c.D<0.05?"var(--warn)":"var(--crit)"}"></i></div>
+  <div class="hint">Drawdown used against the free 5%. The bar filling is not a warning — it is budget being spent. It hitting the end is the warning.</div>`;
+}
+
+function renderMargin(){
+  const c=core();
+  const toWarn=c.m-0.35, toCall=c.m-0.25;
+  $("#marginBox").innerHTML=`
+  <table>
+    <tr><th>Quantity</th><th>Value</th><th>Reading</th></tr>
+    <tr><td>Equity E</td><td>${fmt0(c.E)}</td><td class="sub">cash + Σ q·P</td></tr>
+    <tr><td>Gross G</td><td>${fmt0(c.G)}</td><td class="sub">Σ |q·P|</td></tr>
+    <tr><td>Leverage</td><td class="${c.E>0&&c.G/c.E>1.4?"wn":""}">${c.E>0?fmt(c.G/c.E):"—"}×</td><td class="sub">cap 2.0×, discipline 1.4×</td></tr>
+    <tr><td>Headroom to 2×</td><td>${fmt0(Math.max(0,2*c.E-c.G))}</td><td class="sub">new gross you may add</td></tr>
+    <tr><td>Adverse move to warning</td><td class="${toWarn<0.05?"wn":""}">${isFinite(c.m)?(Math.max(0,toWarn)*100).toFixed(1)+"%":"—"}</td><td class="sub">on gross notional</td></tr>
+    <tr><td>Adverse move to call</td><td class="${toCall<0.05?"bad":""}">${isFinite(c.m)?(Math.max(0,toCall)*100).toFixed(1)+"%":"—"}</td><td class="sub">forced liquidation, largest first</td></tr>
+  </table>
+  <div class="note c">A margin call is not a slap — the house closes you at impact prices, which prints the drawdown that caused it and can tip you into a bailout. The call is the event you are actually avoiding, not the warning banner.</div>`;
+}
+
+function renderBook(){
+  const rows=Object.entries(st.book).filter(([t,q])=>q);
+  const c=core();
+  $("#bookTbl").innerHTML=`<tr><th>Asset</th><th>Qty</th><th>Price</th><th>Notional</th><th>% of gross</th><th></th></tr>`+
+  (rows.length?rows.map(([t,q])=>{
+    const u=A(t),nv=q*u.px;
+    return `<tr><td>${t} <span class="sub">${u.nat}</span></td><td class="${cls(q)}">${fmt0(q)}</td><td>${fmt(u.px)}</td><td class="${cls(nv)}">${fmt0(nv)}</td><td>${c.G?fmt(Math.abs(nv)/c.G*100,1):"—"}%</td>
+    <td><button class="btn" data-del="${t}" style="padding:1px 7px">×</button></td></tr>`;
+  }).join(""):`<tr><td colspan="6" class="sub">flat</td></tr>`)
+  +`<tr><td><b>Total</b></td><td></td><td></td><td><b>${fmt0(c.G)}</b></td><td>gross</td><td></td></tr>`;
+  $$("#bookTbl [data-del]").forEach(b=>b.onclick=()=>{setPos(b.dataset.del,0);all();});
+}
+
+function renderStress(){
+  const c=core(), x=(+$("#stressPct").value||0)/100;
+  const out=[];
+  for(const mv of [-x,-x/2,0,x/2,x]){
+    const dE=mv*c.G, E=c.E+dE, N=E-st.inj;
+    const peak=Math.max(c.peak,N), D=Math.max(st.ddRec,(peak-N)/peak,0);
+    const R=N/1e6-1, S=R/Math.max(D,0.05), Sf=S-0.3*(st.nBail+st.nBot)*Math.abs(S);
+    const m=c.G>0?E/c.G:Infinity;
+    out.push({mv,E,N,R,D,Sf,m});
+  }
+  $("#stressTbl").innerHTML=`<tr><th>Move on gross</th><th>Equity</th><th>Net equity</th><th>R</th><th>D</th><th>S_final</th><th>m</th><th>State</th></tr>`+
+  out.map(o=>{
+    const state = !isFinite(o.m)?"flat" : o.m<0.25?"MARGIN CALL" : o.m<0.35?"warning banner" : o.D>0.05?"floor breached" : "inside free zone";
+    const k = state==="MARGIN CALL"?"bad":state==="warning banner"?"bad":state==="floor breached"?"wn":"ok";
+    return `<tr><td class="${cls(o.mv)}">${pct(o.mv,1)}</td><td>${fmt0(o.E)}</td><td>${fmt0(o.N)}</td><td class="${cls(o.R)}">${pct(o.R)}</td><td>${(o.D*100).toFixed(2)}%</td><td class="${cls(o.Sf)}">${fmt(o.Sf)}</td><td>${isFinite(o.m)?fmt(o.m):"∞"}</td><td class="${k}">${state}</td></tr>`;
+  }).join("");
+}
+
+/* ---------------- spillover ---------------- */
+function spill(srcT,shock,tension){
+  const src=A(srcT); if(!src) return [];
+  const [n1,n2]=(tension||"").split("|");
+  const inTension=nat=>(n1&&n2)&&((nat===n1&&src.nat===n2)||(nat===n2&&src.nat===n1));
+  return st.uni.filter(u=>u.t!==srcT&&u.px>0).map(u=>{
+    let nation=0,sector=0,tens=0;
+    if(u.nat===src.nat) nation=0.25*shock;
+    else{
+      if(u.sec===src.sec) sector=0.15*shock;
+      if(inTension(u.nat)) tens=-0.20*shock;
+    }
+    const raw=nation+sector+tens;
+    const capped=clamp(raw,-3,3);
+    return {u,nation,sector,tens,raw,capped};
+  }).filter(r=>Math.abs(r.raw)>1e-9).sort((a,b)=>Math.abs(b.capped)-Math.abs(a.capped));
+}
+
+function renderSpill(){
+  const srcT=$("#spSrc").value, shock=+$("#spShock").value||0, tension=$("#spTension").value;
+  const budget=+$("#spBudget").value||0;
+  const rs=spill(srcT,shock,tension), src=A(srcT);
+  const c=core();
+  let bookPnl=(st.book[srcT]||0)*src.px*shock/100;
+  rs.forEach(r=>{bookPnl+=(st.book[r.u.t]||0)*r.u.px*r.capped/100;});
+  $("#spSummary").innerHTML=`<div class="note">A ${pct(shock/100,1)} headline on <b>${srcT}</b> (${NATIONS[src.nat]} · ${src.sec}) moves ${rs.length} other instruments. Your book's mark-to-market through the full ripple: <b class="mono ${cls(bookPnl)}">${fmt0(bookPnl)}</b> credits ${bookPnl?`→ S_final ${(()=>{const E=c.E+bookPnl,N=E-st.inj,pk=Math.max(c.peak,N),D=Math.max(st.ddRec,(pk-N)/pk,0),R=N/1e6-1,S=R/Math.max(D,0.05);return fmt(S-0.3*(st.nBail+st.nBot)*Math.abs(S));})()}`:""}</div>`;
+  $("#spTbl").innerHTML=`<tr><th>Asset</th><th>Nation</th><th>Sector</th><th>Nation 25%</th><th>Sector 15%</th><th>Tension 20%</th><th>Net</th><th>Capped</th><th>Per unit</th><th>Units for ${fmt0(budget)}</th></tr>`+
+  rs.map(r=>`<tr>
+    <td>${r.u.t}</td><td class="sub">${NATIONS[r.u.nat]}</td><td class="sub">${r.u.sec}</td>
+    <td>${r.nation?fmt(r.nation,2)+"%":"—"}</td><td>${r.sector?fmt(r.sector,2)+"%":"—"}</td><td class="${r.tens?"sr":""}">${r.tens?fmt(r.tens,2)+"%":"—"}</td>
+    <td class="${cls(r.raw)}">${fmt(r.raw,2)}%</td>
+    <td class="${cls(r.capped)}"><b>${fmt(r.capped,2)}%</b>${Math.abs(r.raw)>3?' <span class="tag">cap</span>':""}</td>
+    <td>${fmt(r.u.px*r.capped/100)}</td>
+    <td>${fmt0(budget/r.u.px)}</td></tr>`).join("");
+}
+
+function renderUni(){
+  $("#uniTbl").innerHTML=`<tr><th>Ticker</th><th>Name</th><th>Nation</th><th>Sector</th><th>Class</th><th>Spread</th><th>Round trip</th><th>Max order</th><th>Depth</th><th>Price</th></tr>`+
+  st.uni.map((u,i)=>`<tr>
+    <td><b>${u.t}</b></td><td class="sub">${u.n}</td><td class="sub">${NATIONS[u.nat]}</td>
+    <td><input class="w10" data-sec="${i}" value="${u.sec}" style="width:92px"></td>
+    <td><select data-cl="${i}">${Object.entries(CLASSES).map(([k,v])=>`<option value="${k}" ${k===u.c?"selected":""}>${v.label}</option>`).join("")}</select></td>
+    <td>${(spreadOf(u)*100).toFixed(3)}%</td><td>${(roundTrip(u)*100).toFixed(2)}%</td>
+    <td>${fmt0(CLASSES[u.c].maxOrder)}</td><td>${fmt0(depthOf(u))}</td>
+    <td><input class="w6" type="number" step="0.01" data-px="${i}" value="${u.px}"></td></tr>`).join("");
+  $$("#uniTbl [data-px]").forEach(el=>el.onchange=()=>{st.uni[+el.dataset.px].px=+el.value||0;all();});
+  $$("#uniTbl [data-cl]").forEach(el=>el.onchange=()=>{st.uni[+el.dataset.cl].c=el.value;all();});
+  $$("#uniTbl [data-sec]").forEach(el=>el.onchange=()=>{st.uni[+el.dataset.sec].sec=el.value;all();});
+}
+
+/* ---------------- impact / fade ---------------- */
+const impact=(notional,depth)=>st.impK*Math.pow(Math.max(notional,0)/depth,st.impA);
+function fitImpact(){
+  const f=st.fills.filter(r=>r.n>0&&r.d>0&&r.s>0);
+  if(f.length<2) return null;
+  const xs=f.map(r=>Math.log(r.n/r.d)), ys=f.map(r=>Math.log(r.s/100));
+  const n=f.length, mx=xs.reduce((a,b)=>a+b)/n, my=ys.reduce((a,b)=>a+b)/n;
+  let sxy=0,sxx=0; for(let i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my); sxx+=(xs[i]-mx)**2;}
+  if(sxx<1e-12) return null;
+  const a=sxy/sxx, lk=my-a*mx;
+  let ssr=0,sst=0; for(let i=0;i<n;i++){const p=lk+a*xs[i]; ssr+=(ys[i]-p)**2; sst+=(ys[i]-my)**2;}
+  return {k:Math.exp(lk),a,r2:sst>1e-12?1-ssr/sst:1,n};
+}
+function renderFade(){
+  const tau=+$("#hl").value||60, t=+$("#hold").value||120, notional=+$("#impNotional").value||0;
+  const decay=1-Math.pow(2,-t/tau);
+  $("#fadeSummary").innerHTML=`<div class="note">Over ${t}s with a ${tau}s half-life, <b>${(decay*100).toFixed(1)}%</b> of a deviation reverts. Every round-trip cost below is divided by that, which is why a cheap asset is a fadeable asset and Intricoin mostly is not.</div>`;
+  const rows=st.uni.filter(u=>u.px>0).map(u=>{
+    const d=depthOf(u), imp=impact(notional,d)*2, rt=roundTrip(u)+imp;
+    return {u,d,imp,rt,dstar:rt/decay};
+  }).sort((a,b)=>a.dstar-b.dstar);
+  $("#fadeTbl").innerHTML=`<tr><th>Asset</th><th>Class</th><th>Spread</th><th>Impact ×2</th><th>Round trip</th><th>d* needed</th><th>d* in credits</th><th>Max order</th><th>Verdict</th></tr>`+
+  rows.map(r=>{
+    const v = r.dstar<0.004?["prime fade","ok"] : r.dstar<0.009?["workable",""] : ["too expensive","bad"];
+    return `<tr><td><b>${r.u.t}</b></td><td class="sub">${CLASSES[r.u.c].label}</td><td>${(roundTrip(r.u)*100).toFixed(3)}%</td>
+    <td>${(r.imp*100).toFixed(3)}%</td><td>${(r.rt*100).toFixed(3)}%</td><td><b>${(r.dstar*100).toFixed(3)}%</b></td>
+    <td>${fmt(r.u.px*r.dstar)}</td><td class="sub">${fmt0(CLASSES[r.u.c].maxOrder)}</td><td class="${v[1]}">${v[0]}</td></tr>`;
+  }).join("");
+
+  const fit=fitImpact();
+  $("#calibTag").textContent = fit? `fitted: k=${fit.k.toFixed(4)} α=${fit.a.toFixed(3)} R²=${fit.r2.toFixed(2)} (n=${fit.n})` : "uncalibrated — defaults are a guess";
+  $("#calibTag").className = fit? "tag ok" : "tag wn";
+  $("#cfTbl").innerHTML=`<tr><th>Notional</th><th>Depth</th><th>n/depth</th><th>Slippage</th><th>Model</th><th></th></tr>`+
+  (st.fills.length?st.fills.map((r,i)=>`<tr><td>${fmt0(r.n)}</td><td>${fmt0(r.d)}</td><td>${fmt(r.n/r.d*100,2)}%</td><td>${fmt(r.s,3)}%</td><td class="sub">${fmt(impact(r.n,r.d)*100,3)}%</td><td><button class="btn" data-fdel="${i}" style="padding:1px 7px">×</button></td></tr>`).join("")
+    :`<tr><td colspan="6" class="sub">no fills logged — do this in Session 1</td></tr>`)
+  + (fit?`<tr><td colspan="6"><button class="btn pri" id="applyFit">Apply fit (k=${fit.k.toFixed(4)}, α=${fit.a.toFixed(3)})</button></td></tr>`:"");
+  $$("#cfTbl [data-fdel]").forEach(b=>b.onclick=()=>{st.fills.splice(+b.dataset.fdel,1);all();});
+  const af=$("#applyFit"); if(af) af.onclick=()=>{const f=fitImpact(); st.impK=+f.k.toFixed(5); st.impA=+f.a.toFixed(4); $("#impK").value=st.impK; $("#impA").value=st.impA; all();};
+}
+function renderSplit(){
+  const u=A($("#splitSel").value); if(!u) return;
+  const d=depthOf(u), N=+$("#splitN").value||0, maxO=CLASSES[u.c].maxOrder;
+  const minSlices=Math.ceil(N/maxO);
+  const rows=[1,2,3,4,6,8,12].map(n=>{
+    const per=N/n;
+    const indep=impact(per,d);                    /* each slice priced fresh */
+    const accum=impact(N,d);                      /* full push, no decay     */
+    return {n,per,indep,accum,legal:per<=maxO};
+  });
+  $("#splitTbl").innerHTML=`<tr><th>Slices</th><th>Per order</th><th>% of depth</th><th>Cost if independent</th><th>Cost if fully accumulating</th><th>Legal</th></tr>`+
+  rows.map(r=>`<tr><td>${r.n}</td><td>${fmt0(r.per)}</td><td>${fmt(r.per/d*100,2)}%</td>
+  <td class="ok">${fmt(r.indep*100,3)}%</td><td class="sub">${fmt(r.accum*100,3)}%</td>
+  <td class="${r.legal?"ok":"bad"}">${r.legal?"yes":"rejected"}</td></tr>`).join("")
+  +`<tr><td colspan="6" class="sub">Minimum legal slices for this notional: <b>${minSlices}</b> (one order ≤ 20% of depth = ${fmt0(maxO)})</td></tr>`;
+}
+
+/* ---------------- events / Bayes ---------------- */
+function priors(){
+  const tot=st.evOutcomes.reduce((a,o)=>a+(+o.p||0),0)||1;
+  return st.evOutcomes.map(o=>(+o.p||0)/tot);
+}
+function posterior(){
+  const p=priors(), k=p.length, th=st.theta;
+  const L=p.map(()=>1);
+  for(const e of st.envs){
+    if(e==="") continue;
+    const idx=+e; if(!(idx>=0&&idx<k)) continue;
+    for(let i=0;i<k;i++) L[i]*= (i===idx? th : (1-th)/Math.max(1,k-1));
+  }
+  const un=p.map((pi,i)=>pi*L[i]), s=un.reduce((a,b)=>a+b,0)||1;
+  return un.map(x=>x/s);
+}
+function renderEvents(){
+  const p=priors(), q=posterior(), k=st.evOutcomes.length;
+  $("#thetaV").textContent=st.theta.toFixed(2);
+  $("#evTbl").innerHTML=`<tr><th>Outcome</th><th>Prior %</th><th>Posterior</th><th>Shift</th><th>Envelope evidence</th></tr>`+
+  st.evOutcomes.map((o,i)=>`<tr>
+    <td><input data-evl="${i}" value="${o.l}" style="width:120px"></td>
+    <td><input class="w6" type="number" step="1" data-evp="${i}" value="${o.p}"></td>
+    <td><b>${(q[i]*100).toFixed(1)}%</b></td>
+    <td class="${cls(q[i]-p[i])}">${((q[i]-p[i])*100>=0?"+":"")}${((q[i]-p[i])*100).toFixed(1)}pp</td>
+    <td class="sub">${st.envs.filter(e=>e===String(i)).length} naming it</td></tr>`).join("")
+  +`<tr><td colspan="5" style="padding-top:10px">${[0,1,2].map(j=>`<label class="f" style="display:inline-flex;margin-right:10px">Envelope ${j+1}
+      <select data-env="${j}"><option value="">—</option>${st.evOutcomes.map((o,i)=>`<option value="${i}" ${st.envs[j]===String(i)?"selected":""}>${o.l}</option>`).join("")}</select></label>`).join("")}
+      <button class="btn" id="evAdd">+ outcome</button></td></tr>`;
+  $$("#evTbl [data-evl]").forEach(el=>el.onchange=()=>{st.evOutcomes[+el.dataset.evl].l=el.value;all();});
+  $$("#evTbl [data-evp]").forEach(el=>el.onchange=()=>{st.evOutcomes[+el.dataset.evp].p=+el.value||0;all();});
+  $$("#evTbl [data-env]").forEach(el=>el.onchange=()=>{st.envs[+el.dataset.env]=el.value;all();});
+  $("#evAdd").onclick=()=>{st.evOutcomes.push({l:"Outcome "+(k+1),p:10});all();};
+
+  /* sizing */
+  const t=$("#szSel").value, u=A(t), c=core();
+  if(!st.szMoves[t]) st.szMoves[t]=st.evOutcomes.map(()=>0);
+  while(st.szMoves[t].length<k) st.szMoves[t].push(0);
+  const mv=st.szMoves[t];
+  const evPost=q.reduce((a,qi,i)=>a+qi*(mv[i]||0),0);
+  const evPrior=p.reduce((a,pi,i)=>a+pi*(mv[i]||0),0);
+  const edge=evPost-evPrior;
+  const worst=Math.min(...mv.map(x=>+x||0),0);
+  const maxUnits = (worst<0 && u.px>0) ? Math.floor(Math.max(0,c.freeBudget)/(Math.abs(worst)/100*u.px)) : null;
+  $("#szTbl").innerHTML=`<tr><th>Outcome</th><th>Prior</th><th>Posterior</th><th>Move on ${t} %</th><th>P&L per unit</th></tr>`+
+  st.evOutcomes.map((o,i)=>`<tr><td>${o.l}</td><td class="sub">${(p[i]*100).toFixed(1)}%</td><td>${(q[i]*100).toFixed(1)}%</td>
+    <td><input class="w6" type="number" step="0.5" data-mv="${i}" value="${mv[i]||0}"></td>
+    <td class="${cls(mv[i])}">${fmt(u.px*(mv[i]||0)/100)}</td></tr>`).join("");
+  $$("#szTbl [data-mv]").forEach(el=>el.onchange=()=>{st.szMoves[t][+el.dataset.mv]=+el.value||0;all();});
+  $("#szBox").innerHTML=`
+  <table style="margin-top:10px">
+    <tr><th>Metric</th><th>Value</th><th>Reading</th></tr>
+    <tr><td>E[move] under prior</td><td>${fmt(evPrior,2)}%</td><td class="sub">what the room should already be pricing</td></tr>
+    <tr><td>E[move] under posterior</td><td>${fmt(evPost,2)}%</td><td class="sub">what you believe after the envelopes</td></tr>
+    <tr><td><b>Tradeable edge</b></td><td class="${cls(edge)}"><b>${fmt(edge,2)}%</b></td><td class="sub">the part the price has not absorbed</td></tr>
+    <tr><td>Worst outcome</td><td class="bad">${fmt(worst,2)}%</td><td class="sub">sizing is set by this, not by the mean</td></tr>
+    <tr><td>Max units on free budget</td><td>${maxUnits!=null?fmt0(maxUnits):"—"}</td><td class="sub">${maxUnits!=null?fmt0(maxUnits*u.px)+" notional":"no losing outcome entered"}</td></tr>
+    <tr><td>Edge at that size</td><td class="${cls(edge)}">${maxUnits!=null?fmt0(maxUnits*u.px*edge/100):"—"}</td><td class="sub">credits</td></tr>
+  </table>
+  ${Math.abs(edge)<0.3?`<div class="note w">An edge under about a third of a percent does not clear the round trip on most of this board. Check it against the fade thresholds before you size anything.</div>`:""}`;
+
+  /* reroll */
+  const now=+$("#rrNow").value||0;
+  const expect=st.evOutcomes.reduce((a,o,i)=>{
+    const unit=(st.book[t]||0)*u.px*(mv[i]||0)/100; return a+p[i]*unit;
+  },0);
+  const burned=$("#rrBurn").value==="1", left=+$("#rrLeft").value||0;
+  const gain=expect-now;
+  let verdict,kls,why;
+  if(burned){verdict="No vote available";kls="sub";why="The reroll is already spent for the whole game.";}
+  else if(gain<=0){verdict="Vote NO";kls="ok";why="A fresh draw is worse for you in expectation. Say nothing — abstention counts as No, and a tie counts as No.";}
+  else if(left>0 && gain < Math.abs(now)*0.5){verdict="Vote NO — hold it";kls="wn";why=`A reroll gains about ${fmt0(gain)} credits, which is not worth burning the only reroll in the game with ${left} session${left>1?"s":""} still to come. Save it for the black swan.`;}
+  else {verdict="Vote YES";kls="ok";why=`A fresh draw is worth about ${fmt0(gain)} credits to you, and you need more than half the remaining houses to agree.`;}
+  $("#rrBox").innerHTML=`<table style="margin-top:10px">
+    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>P&L on the landed roll</td><td class="${cls(now)}">${fmt0(now)}</td></tr>
+    <tr><td>Prior-weighted P&L on a reroll</td><td class="${cls(expect)}">${fmt0(expect)}</td></tr>
+    <tr><td>Gain from rerolling</td><td class="${cls(gain)}">${fmt0(gain)}</td></tr>
+  </table><div class="note ${kls==="ok"?"g":kls==="wn"?"w":""}"><b>${verdict}.</b> ${why}</div>`;
+
+  /* fine */
+  const fn=+$("#fineN").value||0, fp=(+$("#fineP").value||0)/100;
+  const fine=Math.max(10000,0.2*fn), exp=fp*fine;
+  const edgeCredits=fn*edge/100;
+  $("#fineBox").innerHTML=`<table style="margin-top:8px">
+    <tr><td>Fine if raided</td><td class="bad">${fmt0(fine)}</td></tr>
+    <tr><td>Expected fine</td><td class="bad">${fmt0(exp)}</td></tr>
+    <tr><td>Edge on that notional</td><td class="${cls(edgeCredits)}">${fmt0(edgeCredits)}</td></tr>
+    <tr><td><b>Net of fine risk</b></td><td class="${cls(edgeCredits-exp)}"><b>${fmt0(edgeCredits-exp)}</b></td></tr>
+  </table>
+  <div class="note ${edgeCredits-exp>0?"g":"c"}">${edgeCredits-exp>0
+    ? "Positive even inside the watch — but the same trade 120 seconds later is positive <i>and</i> free. There is almost never a reason to trade inside the window."
+    : "Negative inside the watch. Wait out the clock. 20% of trade value swamps any edge this board can offer."}</div>`;
+}
+
+/* ---------------- options ---------------- */
+const ncdf=x=>{const t=1/(1+0.2316419*Math.abs(x)),d=0.3989422804014327*Math.exp(-x*x/2),
+  p=d*t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));
+  return x>=0?1-p:p;};
+function bs(S,K,sig,isCall){           /* sig = total stdev to expiry, r = 0 */
+  if(sig<=1e-9) return Math.max(0,isCall?S-K:K-S);
+  if(S<=0) return isCall?0:Math.max(0,K);
+  const d1=(Math.log(S/K))/sig+sig/2, d2=d1-sig;
+  return isCall ? S*ncdf(d1)-K*ncdf(d2) : K*ncdf(-d2)-S*ncdf(-d1);
+}
+const strikesOf=S=>[0.9,1.0,1.1].map(f=>Math.round(S*f));
+function opSeries(){
+  const S=+$("#opS").value||0, sig=(+$("#opVol").value||0)/100, rs=(+$("#opResid").value||0)/100;
+  const out=[];
+  for(const K of strikesOf(S)) for(const isCall of [true,false]){
+    const house=bs(S,K,sig,isCall);
+    const width=Math.max(0.05,0.04*house);
+    const ask=house+width/2, bid=Math.max(0,house-width/2);
+    const fair=st.opScen.reduce((a,o)=>{
+      const tot=st.opScen.reduce((x,y)=>x+(+y.p||0),0)||1;
+      return a+((+o.p||0)/tot)*bs(S*(1+(+o.m||0)/100),K,rs,isCall);
+    },0);
+    out.push({K,isCall,house,bid,ask,fair,edge:fair-ask,edgePct:ask>0?(fair-ask)/ask:0});
+  }
+  return out;
+}
+function renderOptions(){
+  const S=+$("#opS").value||0;
+  const tot=st.opScen.reduce((a,o)=>a+(+o.p||0),0)||1;
+  $("#opScenTbl").innerHTML=`<tr><th>Outcome</th><th>Prob %</th><th>PTRV move %</th><th>Implied spot</th><th>Normalised</th></tr>`+
+  st.opScen.map((o,i)=>`<tr>
+    <td><input data-osl="${i}" value="${o.l}" style="width:110px"></td>
+    <td><input class="w6" type="number" step="1" data-osp="${i}" value="${o.p}"></td>
+    <td><input class="w6" type="number" step="0.5" data-osm="${i}" value="${o.m}"></td>
+    <td>${fmt(S*(1+(+o.m||0)/100))}</td><td class="sub">${((+o.p||0)/tot*100).toFixed(1)}%</td></tr>`).join("");
+  $$("#opScenTbl [data-osl]").forEach(e=>e.onchange=()=>{st.opScen[+e.dataset.osl].l=e.value;all();});
+  $$("#opScenTbl [data-osp]").forEach(e=>e.onchange=()=>{st.opScen[+e.dataset.osp].p=+e.value||0;all();});
+  $$("#opScenTbl [data-osm]").forEach(e=>e.onchange=()=>{st.opScen[+e.dataset.osm].m=+e.value||0;all();});
+
+  const rows=opSeries();
+  const ivCur=$("#ivSel").value;
+  $("#ivSel").innerHTML=rows.map((r,i)=>`<option value="${i}">${r.isCall?"Call":"Put"} ${r.K}${i===2?" (ATM)":""}</option>`).join("");
+  $("#ivSel").value=ivCur||"2";
+  $("#opTbl").innerHTML=`<tr><th>Series</th><th>Strike</th><th>House bid</th><th>House ask</th><th>Smooth-vol mid</th><th>Model fair</th><th>Edge at ask</th><th>Edge %</th><th>Verdict</th></tr>`+
+  rows.map(r=>{
+    const v=r.edge>0.02*r.ask&&r.edge>0.02?["BUY","ok"]:r.edge>0?["marginal",""]:["no",""];
+    return `<tr><td>${r.isCall?"Call":"Put"}</td><td>${r.K}</td><td>${fmt(r.bid)}</td><td>${fmt(r.ask)}</td><td class="sub">${fmt(r.house)}</td>
+    <td><b>${fmt(r.fair)}</b></td><td class="${cls(r.edge)}">${fmt(r.edge)}</td><td class="${cls(r.edge)}">${pct(r.edgePct,1)}</td><td class="${v[1]}">${v[0]}</td></tr>`;
+  }).join("");
+
+  /* straddles */
+  const strad=strikesOf(S).map(K=>{
+    const c=rows.find(r=>r.K===K&&r.isCall), p=rows.find(r=>r.K===K&&!r.isCall);
+    return {K,cost:c.ask+p.ask,fair:c.fair+p.fair};
+  });
+  $("#opStrad").innerHTML=`<h3>Straddles — buying the jump size</h3><table>
+    <tr><th>Strike</th><th>Cost (both asks)</th><th>Model fair</th><th>Edge</th><th>Breakeven move</th></tr>`+
+    strad.map(s=>`<tr><td>${s.K}</td><td>${fmt(s.cost)}</td><td>${fmt(s.fair)}</td><td class="${cls(s.fair-s.cost)}"><b>${fmt(s.fair-s.cost)}</b></td>
+    <td>±${fmt(s.cost/S*100,2)}%</td></tr>`).join("")+`</table>
+    <div class="hint">A straddle is direction-free: you are paying for the size of the jump. Compare the breakeven move against your scenario magnitudes — if the restriction case alone clears it, the straddle is the cleanest trade on the board.</div>`;
+
+  drawOpChart(rows);
+}
+function drawOpChart(rows){
+  const W=680,H=190,P={t:12,r:12,b:30,l:46};
+  const labels=rows.map(r=>(r.isCall?"C":"P")+r.K);
+  const vals=rows.flatMap(r=>[r.fair,r.ask]);
+  const max=Math.max(...vals,0.1)*1.15;
+  const bw=(W-P.l-P.r)/rows.length;
+  const y=v=>H-P.b-(v/max)*(H-P.t-P.b);
+  let bars="";
+  rows.forEach((r,i)=>{
+    const x0=P.l+i*bw;
+    const w=(bw-6)/2;
+    const h1=Math.max(1,H-P.b-y(r.fair)), h2=Math.max(1,H-P.b-y(r.ask));
+    bars+=`<rect x="${x0+2}" y="${y(r.fair)}" width="${w}" height="${h1}" rx="3" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"><title>${labels[i]} model fair ${fmt(r.fair)}</title></rect>`;
+    bars+=`<rect x="${x0+4+w}" y="${y(r.ask)}" width="${w}" height="${h2}" rx="3" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"><title>${labels[i]} house ask ${fmt(r.ask)}</title></rect>`;
+    bars+=`<text x="${x0+bw/2}" y="${H-P.b+14}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  let grid="";
+  for(let g=0;g<=3;g++){const v=max*g/3; grid+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${P.l-6}" y="${y(v)+3}" text-anchor="end">${fmt(v,1)}</text>`;}
+  $("#opChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Model fair value against house ask for each option series">
+    ${grid}<line x1="${P.l}" x2="${W-P.r}" y1="${H-P.b}" y2="${H-P.b}" stroke="var(--axis)"/>${bars}</svg>`;
+}
+
+/* ---------------- IPO ---------------- */
+function ipoValue(){
+  const metric=+$("#ldgrMetric").value||0, cut=(+$("#ldgrCut").value||0)/100;
+  const ms=st.comps.filter(c=>c.px>0&&c.m>0).map(c=>c.px/c.m).sort((a,b)=>a-b);
+  const med=ms.length? (ms.length%2?ms[(ms.length-1)/2]:(ms[ms.length/2-1]+ms[ms.length/2])/2) : 0;
+  const raw=med*metric, val=raw*(1-cut);
+  const ovr=+$("#ldgrOvr").value;
+  return {ms,med,raw,val:(ovr>0?ovr:val),overridden:ovr>0};
+}
+function renderIpo(){
+  $("#compTbl").innerHTML=`<tr><th>Comparable</th><th>Price</th><th>Metric</th><th>Multiple</th></tr>`+
+  st.comps.map((c,i)=>`<tr>
+    <td><input data-ct="${i}" value="${c.t}" style="width:72px"></td>
+    <td><input class="w6" type="number" step="0.01" data-cp="${i}" value="${c.px}"></td>
+    <td><input class="w6" type="number" step="0.01" data-cm="${i}" value="${c.m}"></td>
+    <td>${c.m>0?fmt(c.px/c.m):"—"}×</td></tr>`).join("");
+  $$("#compTbl [data-ct]").forEach(e=>e.onchange=()=>{st.comps[+e.dataset.ct].t=e.value;all();});
+  $$("#compTbl [data-cp]").forEach(e=>e.onchange=()=>{st.comps[+e.dataset.cp].px=+e.value||0;all();});
+  $$("#compTbl [data-cm]").forEach(e=>e.onchange=()=>{st.comps[+e.dataset.cm].m=+e.value||0;all();});
+
+  const v=ipoValue();
+  $("#valBox").innerHTML=`<table style="margin-top:10px">
+    <tr><th>Step</th><th>Value</th></tr>
+    <tr><td>Median comparable multiple</td><td>${fmt(v.med)}×</td></tr>
+    <tr><td>Un-haircut value</td><td>${fmt(v.raw)}</td></tr>
+    <tr><td><b>Value per share V</b></td><td><b>${fmt(v.val)}</b>${v.overridden?' <span class="tag">override</span>':""}</td></tr>
+    <tr><td>Floor</td><td class="sub">bids under 20 rejected</td></tr>
+  </table>`;
+
+  const sig=+$("#sigV").value||0, lam=+$("#lamV").value||0;
+  const shaded=v.val-lam*sig;
+  const c=core();
+  $("#bidTbl").innerHTML=`<tr><th>#</th><th>Price</th><th>Qty</th><th>Cost if filled</th><th>Legal</th></tr>`+
+  st.bids.map((b,i)=>`<tr><td>${i+1}</td>
+    <td><input class="w6" type="number" step="0.5" data-bp="${i}" value="${b.p}"></td>
+    <td><input class="w10" type="number" step="1000" data-bq="${i}" value="${b.q}"></td>
+    <td>${fmt0(b.p*b.q)}</td><td class="${b.p>=20||b.p===0?"ok":"bad"}">${b.p>=20||b.p===0?"ok":"rejected (<20)"}</td></tr>`).join("")
+    +`<tr><td colspan="3"><b>Total locked</b></td><td><b>${fmt0(st.bids.reduce((a,b)=>a+b.p*b.q,0))}</b></td><td></td></tr>`;
+  $$("#bidTbl [data-bp]").forEach(e=>e.onchange=()=>{st.bids[+e.dataset.bp].p=+e.value||0;all();});
+  $$("#bidTbl [data-bq]").forEach(e=>e.onchange=()=>{st.bids[+e.dataset.bq].q=+e.value||0;all();});
+
+  const locked=st.bids.reduce((a,b)=>a+b.p*b.q,0);
+  $("#cashBox").innerHTML=`<table style="margin-top:8px">
+    <tr><td>Shaded value V − λσ</td><td><b>${fmt(shaded)}</b></td></tr>
+    <tr><td>Cash</td><td>${fmt0(st.cash)}</td></tr>
+    <tr><td>Locked by bids</td><td class="${locked>st.cash?"bad":""}">${fmt0(locked)}</td></tr>
+    <tr><td>Cash left to trade</td><td class="${st.cash-locked<0?"bad":""}">${fmt0(st.cash-locked)}</td></tr>
+  </table>
+  ${locked>st.cash?`<div class="note c">Bids exceed cash — they will not all stand. Trim before the close.</div>`:""}
+  <div class="note w">Locked cash still counts in equity, so your margin ratio looks unchanged while your ability to act has gone. If the session needs dry powder, bid smaller.</div>`;
+
+  /* clearing */
+  $("#demTbl").innerHTML=`<tr><th>Price</th><th>Other houses' cumulative demand</th><th></th></tr>`+
+  st.demand.map((d,i)=>`<tr>
+    <td><input class="w6" type="number" step="0.5" data-dp="${i}" value="${d.p}"></td>
+    <td><input class="w10" type="number" step="5000" data-dq="${i}" value="${d.q}"></td>
+    <td><button class="btn" data-ddel="${i}" style="padding:1px 7px">×</button></td></tr>`).join("")
+    +`<tr><td colspan="3"><button class="btn" id="demAdd">+ point</button></td></tr>`;
+  $$("#demTbl [data-dp]").forEach(e=>e.onchange=()=>{st.demand[+e.dataset.dp].p=+e.value||0;all();});
+  $$("#demTbl [data-dq]").forEach(e=>e.onchange=()=>{st.demand[+e.dataset.dq].q=+e.value||0;all();});
+  $$("#demTbl [data-ddel]").forEach(b=>b.onclick=()=>{st.demand.splice(+b.dataset.ddel,1);all();});
+  $("#demAdd").onclick=()=>{st.demand.push({p:20,q:0});all();};
+
+  const SHARES=200000;
+  const pts=[...st.demand].filter(d=>d.p>=20).sort((a,b)=>b.p-a.p);
+  const myBids=st.bids.filter(b=>b.q>0&&b.p>=20);
+  const otherAtOrAbove=px=>pts.filter(d=>d.p>=px).reduce((a,d)=>Math.max(a,d.q),0);
+  const otherAbove=px=>pts.filter(d=>d.p>px).reduce((a,d)=>Math.max(a,d.q),0);
+  const mineAtOrAbove=px=>myBids.filter(b=>b.p>=px).reduce((a,b)=>a+b.q,0);
+  const mineAbove=px=>myBids.filter(b=>b.p>px).reduce((a,b)=>a+b.q,0);
+  let clearing=null;
+  const prices=[...new Set([...pts.map(p=>p.p),...myBids.map(b=>b.p)])].sort((a,b)=>b-a);
+  for(const px of prices){ clearing=px; if(otherAtOrAbove(px)+mineAtOrAbove(px)>=SHARES) break; }
+  let alloc=0,totalAt=0;
+  if(clearing!=null){
+    totalAt=otherAtOrAbove(clearing)+mineAtOrAbove(clearing);
+    if(totalAt<=SHARES) alloc=mineAtOrAbove(clearing);
+    else{
+      const mA=mineAbove(clearing), oA=otherAbove(clearing);
+      const remainder=Math.max(0,SHARES-mA-oA);
+      const mT=mineAtOrAbove(clearing)-mA, oT=otherAtOrAbove(clearing)-oA;
+      alloc=mA+(mT+oT>0?remainder*mT/(mT+oT):0);
+    }
+  }
+  const pnl=alloc*(v.val-(clearing||0));
+  $("#clearBox").innerHTML=`<table style="margin-top:10px">
+    <tr><th>Result</th><th>Value</th><th>Reading</th></tr>
+    <tr><td>Clearing price</td><td><b>${clearing!=null?fmt(clearing):"—"}</b></td><td class="sub">everyone who wins pays this</td></tr>
+    <tr><td>Demand at clearing</td><td>${fmt0(totalAt)}</td><td class="sub">of 200,000 offered</td></tr>
+    <tr><td>Your allocation</td><td>${fmt0(alloc)}</td><td class="sub">${alloc+0.5<mineAtOrAbove(clearing??Infinity)?"pro-rated at the clearing price":"filled in full"}</td></tr>
+    <tr><td>Cash paid</td><td>${fmt0(alloc*(clearing||0))}</td><td class="sub">released from the lock</td></tr>
+    <tr><td><b>P&L vs your value</b></td><td class="${cls(pnl)}"><b>${fmt0(pnl)}</b></td><td class="sub">the stock starts trading at clearing and drifts to value</td></tr>
+  </table>
+  ${clearing!=null&&clearing>v.val?`<div class="note c">Clearing above your value. The price drifts down to value over the following minutes — this is the winner's curse arriving on schedule. Bidding less, or not at all, is the correct response.</div>`:""}`;
+}
+
+/* ---------------- black swan ---------------- */
+function faceMoves(f){
+  const mv={};
+  for(const [t,s] of Object.entries(f.s||{})){
+    mv[t]=(mv[t]||0)+(+s||0);
+    for(const r of spill(t,+s||0,"")) mv[r.u.t]=(mv[r.u.t]||0)+r.capped;
+  }
+  for(const k of Object.keys(mv)) mv[k]=clamp(mv[k],-95,500);
+  return mv;
+}
+function facePnl(f,book){
+  const mv=faceMoves(f); let p=0;
+  for(const [t,q] of Object.entries(book)){
+    const u=A(t); if(!u||!q) continue;
+    p+=q*u.px*(mv[t]||0)/100;
+  }
+  return p;
+}
+function scoreAfter(pnl){
+  const c=core(); const E=c.E+pnl, N=E-st.inj;
+  const pk=Math.max(c.peak,N), D=Math.max(st.ddRec,(pk-N)/pk,0);
+  const R=N/1e6-1, S=R/Math.max(D,0.05);
+  return {Sf:S-0.3*(st.nBail+st.nBot)*Math.abs(S),D,R,m:c.G>0?E/c.G:Infinity};
+}
+function renderSwan(){
+  $("#swanTbl").innerHTML=`<tr><th>Face</th><th>Label</th><th>Primary shocks</th><th>Propagated assets</th></tr>`+
+  st.swan.map((f,i)=>{
+    const mv=faceMoves(f);
+    const top=Object.entries(mv).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,6)
+      .map(([t,v])=>`${t} ${v>0?"+":""}${v.toFixed(1)}%`).join(" · ");
+    return `<tr><td>${i+1}</td><td><input data-swl="${i}" value="${f.l}" style="width:180px"></td>
+      <td class="sub">${Object.entries(f.s||{}).map(([t,v])=>`${t} ${v>0?"+":""}${v}%`).join(" · ")||"none"}</td>
+      <td class="sub">${top||"—"}</td></tr>`;
+  }).join("");
+  $$("#swanTbl [data-swl]").forEach(e=>e.onchange=()=>{st.swan[+e.dataset.swl].l=e.value;all();});
+
+  const c=core();
+  const rows=st.swan.map((f,i)=>{const p=facePnl(f,st.book); return {i,f,p,...scoreAfter(p)};});
+  const worst=rows.reduce((a,b)=>b.p<a.p?b:a,rows[0]);
+  const expct=rows.reduce((a,r)=>a+r.p/6,0);
+  $("#swPnlTbl").innerHTML=`<tr><th>Face</th><th>P&L</th><th>Return</th><th>Drawdown</th><th>S_final</th><th>Margin</th><th>State</th></tr>`+
+  rows.map(r=>{
+    const state=!isFinite(r.m)?"flat":r.m<0.25?"MARGIN CALL":r.m<0.35?"warning":r.D>0.05?"floor breached":"survivable";
+    const k=state==="MARGIN CALL"?"bad":state==="warning"?"bad":state==="floor breached"?"wn":"ok";
+    return `<tr><td>${r.i+1} <span class="sub">${r.f.l}</span></td><td class="${cls(r.p)}">${fmt0(r.p)}</td><td class="${cls(r.R)}">${pct(r.R)}</td>
+    <td>${(r.D*100).toFixed(2)}%</td><td class="${cls(r.Sf)}">${fmt(r.Sf)}</td><td>${isFinite(r.m)?fmt(r.m):"∞"}</td><td class="${k}">${state}</td></tr>`;
+  }).join("");
+  $("#swBox").innerHTML=`<table style="margin-top:10px">
+    <tr><td>Worst face</td><td class="bad"><b>${worst.f.l}</b> — ${fmt0(worst.p)} credits, S_final ${fmt(worst.Sf)}</td></tr>
+    <tr><td>Expected P&L (uniform d6)</td><td class="${cls(expct)}">${fmt0(expct)}</td></tr>
+    <tr><td>Spread worst→best</td><td>${fmt0(Math.max(...rows.map(r=>r.p))-worst.p)}</td></tr>
+  </table>
+  <div class="note ${worst.D>0.05?"c":"g"}">${worst.D>0.05
+    ? `The worst face puts you at ${(worst.D*100).toFixed(1)}% drawdown. That is past the floor, and the time left will not earn it back. Hedge the floor up before the roll, not after.`
+    : `Every face keeps you inside the free zone. This book is roll-proof — which is exactly the state you want to be in when the last 1.7 minutes go blind.`}</div>`;
+  drawSwanChart(rows);
+}
+function drawSwanChart(rows){
+  const W=680,H=180,P={t:14,r:14,b:34,l:62};
+  const vals=rows.map(r=>r.p), mx=Math.max(...vals.map(Math.abs),1)*1.2;
+  const bw=(W-P.l-P.r)/rows.length, zero=P.t+(H-P.t-P.b)/2;
+  const y=v=>zero-(v/mx)*((H-P.t-P.b)/2);
+  let bars="";
+  rows.forEach((r,i)=>{
+    const x0=P.l+i*bw+4, w=bw-8;
+    const yy=Math.min(zero,y(r.p)), h=Math.max(1,Math.abs(y(r.p)-zero));
+    bars+=`<rect x="${x0}" y="${yy}" width="${w}" height="${h}" rx="3" fill="${r.p>=0?"var(--good)":"var(--crit)"}" stroke="var(--surface)" stroke-width="2"><title>${r.f.l}: ${fmt0(r.p)} credits, S_final ${fmt(r.Sf)}</title></rect>`;
+    bars+=`<text x="${x0+w/2}" y="${H-P.b+14}" text-anchor="middle">Face ${r.i+1}</text>`;
+    if(Math.abs(r.p)>=500) bars+=`<text x="${x0+w/2}" y="${r.p>=0?yy-4:yy+h+11}" text-anchor="middle" fill="var(--ink-2)">${fmt0(r.p/1000)}k</text>`;
+  });
+  $("#swChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Profit and loss of the current book under each die face">
+    <line x1="${P.l}" x2="${W-P.r}" y1="${zero}" y2="${zero}" stroke="var(--axis)"/>
+    <text x="${P.l-6}" y="${zero+3}" text-anchor="end">0</text>${bars}</svg>`;
+}
+function solveHedge(){
+  const cap=+$("#hedgeCap").value||0;
+  const base=st.swan.map(f=>facePnl(f,st.book));
+  const baseWorst=Math.min(...base);
+  const res=[];
+  for(const u of st.uni){
+    if(u.px<=0) continue;
+    const maxQ=Math.floor(cap/u.px); if(maxQ<1) continue;
+    const mvs=st.swan.map(f=>{const m=faceMoves(f); return (m[u.t]||0)/100*u.px;});
+    let bestQ=0,bestW=baseWorst;
+    for(let s=-40;s<=40;s++){
+      const q=Math.round(maxQ*s/40); if(!q) continue;
+      let w=Infinity;
+      for(let i=0;i<6;i++) w=Math.min(w,base[i]+q*mvs[i]);
+      if(w>bestW+1e-9){bestW=w;bestQ=q;}
+    }
+    if(bestQ) res.push({t:u.t,q:bestQ,notional:Math.abs(bestQ*u.px),worst:bestW,lift:bestW-baseWorst});
+  }
+  res.sort((a,b)=>b.lift-a.lift);
+  $("#hedgeTbl").innerHTML=`<tr><th>Instrument</th><th>Qty</th><th>Side</th><th>Notional</th><th>New worst case</th><th>Lift</th><th>New S_final at worst</th></tr>`+
+  (res.length?res.slice(0,10).map(r=>`<tr><td><b>${r.t}</b></td><td>${fmt0(r.q)}</td><td class="${r.q>0?"ok":"sr"}">${r.q>0?"long":"short"}</td>
+    <td>${fmt0(r.notional)}</td><td class="${cls(r.worst)}">${fmt0(r.worst)}</td><td class="ok">+${fmt0(r.lift)}</td>
+    <td>${fmt(scoreAfter(r.worst).Sf)}</td></tr>`).join("")
+    :`<tr><td colspan="7" class="sub">No single-instrument hedge improves the worst case — either the book is already balanced, or the budget is too small.</td></tr>`)
+  +`<tr><td colspan="7" class="sub">Baseline worst case: ${fmt0(baseWorst)} credits. Shorts require Session 3 or later.</td></tr>`;
+}
+
+/* ---------------- wiring ---------------- */
+const TABS=[["desk","Desk & risk"],["spill","Spillover"],["impact","Impact & fade"],["events","Events & envelopes"],["options","Options"],["ipo","IPO"],["swan","Black swan"],["play","Playbook"]];
+$("#nav").innerHTML=TABS.map(([k,l],i)=>`<button data-t="${k}" aria-selected="${i===0}">${l}</button>`).join("");
+$$("#nav button").forEach(b=>b.onclick=()=>{
+  $$("#nav button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  $$("section[data-tab]").forEach(s=>s.classList.toggle("hidden",s.dataset.tab!==b.dataset.t));
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+
+function fillSelects(){
+  const opts=st.uni.filter(u=>u.px>0).map(u=>`<option value="${u.t}">${u.t} — ${u.n}</option>`).join("");
+  const every=st.uni.map(u=>`<option value="${u.t}">${u.t} — ${u.n}</option>`).join("");
+  for(const [id,html,def] of [["#addSel",every,"GMB"],["#spSrc",opts,"ZAP"],["#splitSel",opts,"GMB"],["#szSel",opts,st.szAsset],["#swAsset",opts,"HASH"]]){
+    const el=$(id), cur=el.value; el.innerHTML=html; el.value=cur||def;
+    if(!el.value) el.value=def;
+  }
+  $("#swFace").innerHTML=st.swan.map((f,i)=>`<option value="${i}">${i+1} — ${f.l}</option>`).join("");
+}
+
+let watchT=null,watchEnd=0;
+function tickWatch(){
+  const left=Math.max(0,Math.ceil((watchEnd-Date.now())/1000));
+  $("#watchClock").textContent=watchEnd?`${left}s`:"—";
+  $("#watchClock").className="big "+(watchEnd?(left>0?"bad":"ok"):"");
+  $("#watchState").innerHTML=!watchEnd?`<div class="sub">No watch running.</div>`
+    : left>0?`<div class="note c"><b>WATCHED.</b> Every trade in an asset this chapter can move is on the Commission's list. Do not trade it. ${left} seconds left.</div>`
+           : `<div class="note g"><b>CLEAR.</b> The watch has expired. Trades from here are not flagged, and the reveal has not happened yet.</div>`;
+  if(watchEnd && left<=0){clearInterval(watchT); watchT=null;}
+}
+$("#watchStart").onclick=()=>{watchEnd=Date.now()+120000; if(watchT)clearInterval(watchT); watchT=setInterval(tickWatch,250); tickWatch();};
+$("#watchStop").onclick=()=>{watchEnd=0; if(watchT)clearInterval(watchT); watchT=null; tickWatch();};
+
+/* positions book like trades at the current price: cash moves opposite, equity does not jump */
+function setPos(t,q){
+  const u=A(t); if(!u) return;
+  const dq=q-(st.book[t]||0);
+  st.cash-=dq*u.px;
+  if(q) st.book[t]=q; else delete st.book[t];
+  $("#cash").value=Math.round(st.cash);
+}
+$("#addBtn").onclick=()=>{setPos($("#addSel").value,+$("#addQty").value||0); all();};
+$("#flatBtn").onclick=()=>{for(const t of Object.keys(st.book)) setPos(t,0); all();};
+$("#cfAdd").onclick=()=>{const n=+$("#cfN").value,d=+$("#cfD").value,s=+$("#cfS").value; if(n>0&&d>0&&s>0){st.fills.push({n,d,s});all();}};
+$("#swAdd").onclick=()=>{const i=+$("#swFace").value,t=$("#swAsset").value,s=+$("#swShock").value||0;
+  st.swan[i].s=st.swan[i].s||{}; if(s) st.swan[i].s[t]=s; else delete st.swan[i].s[t]; all();};
+$("#hedgeBtn").onclick=solveHedge;
+$("#ladderBtn").onclick=()=>{
+  const v=ipoValue(), sig=+$("#sigV").value||0, lam=+$("#lamV").value||0;
+  const sh=Math.max(20,v.val-lam*sig);
+  const budget=st.cash*0.35;
+  st.bids=[
+    {p:+Math.max(20,sh*1.08).toFixed(2), q:Math.floor(budget*0.2/(sh*1.08))},
+    {p:+Math.max(20,sh).toFixed(2),      q:Math.floor(budget*0.55/sh)},
+    {p:+Math.max(20,sh*0.90).toFixed(2), q:Math.floor(budget*0.25/(sh*0.9))}
+  ];
+  all();
+};
+$("#ivBtn").onclick=()=>{
+  const rows=opSeries(), r=rows[+$("#ivSel").value], target=+$("#ivPx").value;
+  if(!(target>0)){$("#ivOut").textContent="enter a quote";return;}
+  const S=+$("#opS").value;
+  const intrinsic=Math.max(0,r.isCall?S-r.K:r.K-S), upper=r.isCall?S:r.K;
+  if(target<=intrinsic+1e-6||target>=upper){
+    $("#ivOut").innerHTML=`<span class="bad">No volatility fits: ${r.isCall?"call":"put"} ${r.K} must trade between intrinsic ${fmt(intrinsic)} and ${fmt(upper)}. Check the series and the spot.</span>`;
+    return;
+  }
+  let lo=0.0005,hi=2.0;
+  for(let i=0;i<80;i++){const mid=(lo+hi)/2; if(bs(S,r.K,mid,r.isCall)<target) lo=mid; else hi=mid;}
+  const sig=(lo+hi)/2;
+  $("#opVol").value=(sig*100).toFixed(2);
+  $("#opResid").value=(sig*40).toFixed(2);
+  $("#ivOut").textContent=`σ = ${(sig*100).toFixed(2)}% to expiry — applied to all six series`;
+  all();
+};
+$("#theta").oninput=()=>{st.theta=+$("#theta").value; renderEvents(); save();};
+$("#saveBtn").onclick=()=>{save(); $("#saveBtn").textContent="Saved"; setTimeout(()=>$("#saveBtn").textContent="Save state",1200);};
+$("#resetBtn").onclick=()=>{st=structuredClone(DEF); syncInputs(); all();};
+
+["#cash","#inj","#nBail","#nBot"].forEach(id=>$(id).onchange=()=>{
+  st.cash=+$("#cash").value||0; st.inj=+$("#inj").value||0;
+  st.nBail=clamp(+$("#nBail").value||0,0,3); st.nBot=Math.max(0,+$("#nBot").value||0); all();});
+["#impK","#impA"].forEach(id=>$(id).onchange=()=>{st.impK=+$("#impK").value||0; st.impA=+$("#impA").value||0; all();});
+$("#szSel").onchange=()=>{st.szAsset=$("#szSel").value; all();};
+["#stressPct","#spSrc","#spShock","#spTension","#spBudget","#hl","#hold","#impNotional","#splitSel","#splitN",
+ "#opS","#opVol","#opResid","#ldgrMetric","#ldgrCut","#ldgrOvr","#sigV","#lamV","#fineN","#fineP","#rrNow","#rrBurn","#rrLeft"]
+ .forEach(id=>{const el=$(id); if(el){el.oninput=all; el.onchange=all;}});
+
+["#peak","#ddRec"].forEach(id=>$(id).onchange=()=>{
+  st.peak=Math.max(1000000,+$("#peak").value||1000000);
+  st.ddRec=clamp((+$("#ddRec").value||0)/100,0,1); all();});
+$("#peakReset").onclick=()=>{st.peak=1000000; st.ddRec=0; all();};
+function ratchet(){
+  const c=core();
+  if(c.N>st.peak) st.peak=c.N;
+  const dd=(st.peak-c.N)/st.peak;
+  if(dd>st.ddRec) st.ddRec=dd;
+  if(document.activeElement!==$("#peak")) $("#peak").value=Math.round(st.peak);
+  if(document.activeElement!==$("#ddRec")) $("#ddRec").value=(st.ddRec*100).toFixed(2);
+}
+function syncInputs(){
+  $("#cash").value=st.cash; $("#inj").value=st.inj; $("#nBail").value=st.nBail; $("#nBot").value=st.nBot;
+  $("#impK").value=st.impK; $("#impA").value=st.impA; $("#theta").value=st.theta;
+}
+function all(){
+  fillSelects(); ratchet();
+  renderRisk(); renderScore(); renderMargin(); renderBook(); renderStress();
+  renderUni(); renderSpill(); renderFade(); renderSplit();
+  renderEvents(); renderOptions(); renderIpo(); renderSwan();
+  save();
+}
+syncInputs(); all(); tickWatch();
+</script>
+</body>
+</html>
